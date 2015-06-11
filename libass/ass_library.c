@@ -106,6 +106,7 @@ static int grow_array(void **array, int nelem, size_t elsize)
 
 void ass_add_font(ASS_Library *priv, char *name, char *data, int size)
 {
+    printf("%p;%s: %s\n", priv, __func__, name);
     int idx = priv->num_fontdata;
     if (!name || !data || !size)
         return;
@@ -133,6 +134,7 @@ error:
 
 void ass_clear_fonts(ASS_Library *priv)
 {
+    printf("%p;%s\n", priv, __func__);
     int i;
     for (i = 0; i < priv->num_fontdata; ++i) {
         free(priv->fontdata[i].name);

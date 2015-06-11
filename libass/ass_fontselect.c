@@ -106,52 +106,30 @@ struct font_provider {
     void *priv;
 };
 
-// simple glyph coverage map
-typedef struct coverage_map CoverageMap;
-struct coverage_map {
-    int n_codepoint;
-    uint32_t *codepoints;
-};
-
 typedef struct font_data_ft FontDataFT;
 struct font_data_ft {
     ASS_Library *lib;
-    CoverageMap *coverage;
+    FT_Face face;
     char *name;
     int idx;
 };
 
 static int check_glyph_ft(void *data, uint32_t codepoint)
 {
-    int i;
-    CoverageMap *coverage = ((FontDataFT *)data)->coverage;
+    FontDataFT *fd = (FontDataFT *)data;
 
     if (!codepoint)
         return 1;
 
-    // XXX: sort at map creation and use bsearch here - is this worth it?
-    for (i = 0; i < coverage->n_codepoint; i++)
-        if (coverage->codepoints[i] == codepoint)
-            return 1;
-
-    return 0;
-}
-
-static void coverage_map_destroy(void *data)
-{
-    CoverageMap *coverage = (CoverageMap *)data;
-
-    free(coverage->codepoints);
-    free(coverage);
+    return !!FT_Get_Char_Index(fd->face, codepoint);
 }
 
 static void destroy_font_ft(void *data)
 {
     FontDataFT *fd = (FontDataFT *)data;
 
-    if (fd->coverage)
-        coverage_map_destroy(fd->coverage);
-
+    printf("%p;%s: %s\n", fd->lib, __func__, fd->name);
+    FT_Done_Face(fd->face);
     free(fd->name);
     free(fd);
 }
@@ -695,39 +673,6 @@ static void free_font_info(ASS_FontProviderMetaData *meta)
 }
 
 /**
- * \brief Calculate a coverage map (array with codepoints) from a FreeType
- * face. This can be used to check glyph coverage quickly.
- * \param face FreeType face
- * \return CoverageMap structure
- */
-static CoverageMap *get_coverage_map(FT_Face face)
-{
-    int i = 0;
-    int n_codepoint = 0;
-    uint32_t codepoint;
-    unsigned index;
-    CoverageMap *coverage = calloc(1, sizeof(CoverageMap));
-
-    // determine number of codepoints first
-    codepoint = FT_Get_First_Char(face, &index);
-    while (index) {
-        n_codepoint++;
-        codepoint = FT_Get_Next_Char(face, codepoint, &index);
-    }
-
-    coverage->codepoints = calloc(n_codepoint, sizeof(uint32_t));
-    codepoint = FT_Get_First_Char(face, &index);
-    while (index) {
-        coverage->codepoints[i++] = codepoint;
-        codepoint = FT_Get_Next_Char(face, codepoint, &index);
-    }
-
-    coverage->n_codepoint = n_codepoint;
-
-    return coverage;
-}
-
-/**
  * \brief Process memory font.
  * \param priv private data
  * \param library library object
@@ -771,14 +716,14 @@ static void process_fontdata(ASS_FontProvider *priv, ASS_Library *library,
 
         ft = calloc(1, sizeof(FontDataFT));
         ft->lib      = library;
-        ft->coverage = get_coverage_map(face);
+        ft->face     = face;
         ft->name     = strdup(name);
         ft->idx      = -1;
 
+        printf("%p;%s: %s\n", library, __func__, name);
         ass_font_provider_add_font(priv, &info, NULL, face_index, NULL, ft);
 
         free_font_info(&info);
-        FT_Done_Face(face);
     }
 }
 
