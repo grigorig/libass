@@ -29,6 +29,7 @@
 #include "ass_utils.h"
 #include "ass_drawing.h"
 #include "ass_font.h"
+#include "PMurHash.h"
 
 #define CURVE_ACCURACY 64.0
 #define GLYPH_INITIAL_POINTS 100
@@ -335,7 +336,7 @@ void ass_drawing_hash(ASS_Drawing* drawing)
 {
     if (!drawing->text)
         return;
-    drawing->hash = fnv_32a_str(drawing->text, FNV1_32A_INIT);
+    drawing->hash = PMurHash32(0, drawing->text, strlen(drawing->text));
 }
 
 /*

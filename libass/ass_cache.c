@@ -28,6 +28,7 @@
 #include "ass_utils.h"
 #include "ass_font.h"
 #include "ass_cache.h"
+#include "PMurHash.h"
 
 // type-specific functions
 // create hash/compare functions for bitmap, outline and composite cache
@@ -40,12 +41,12 @@
 static unsigned font_hash(void *buf, size_t len)
 {
     ASS_FontDesc *desc = buf;
-    unsigned hval;
-    hval = fnv_32a_str(desc->family, FNV1_32A_INIT);
-    hval = fnv_32a_buf(&desc->bold, sizeof(desc->bold), hval);
-    hval = fnv_32a_buf(&desc->italic, sizeof(desc->italic), hval);
-    hval = fnv_32a_buf(&desc->vertical, sizeof(desc->vertical), hval);
-    return hval;
+    uint32_t hval = 0, hcarry = 0;
+    PMurHash32_Process(&hval, &hcarry, desc->family, strlen(desc->family));
+    PMurHash32_Process(&hval, &hcarry, &desc->bold, sizeof(desc->bold));
+    PMurHash32_Process(&hval, &hcarry, &desc->italic, sizeof(desc->italic));
+    PMurHash32_Process(&hval, &hcarry, &desc->vertical, sizeof(desc->vertical));
+    return PMurHash32_Result(hval, hcarry, 0);
 }
 
 static unsigned font_compare(void *key1, void *key2, size_t key_size)
@@ -149,13 +150,14 @@ static size_t composite_size(void *value, size_t value_size)
 static unsigned composite_hash(void *key, size_t key_size)
 {
     CompositeHashKey *k = key;
-    unsigned hval = filter_hash(&k->filter, key_size);
+    uint32_t hcarry = 0;
+    uint32_t hval = filter_hash(&k->filter, key_size);
     for (size_t i = 0; i < k->bitmap_count; ++i) {
-        hval = fnv_32a_buf(&k->bitmaps[i].image, sizeof(k->bitmaps[i].image), hval);
-        hval = fnv_32a_buf(&k->bitmaps[i].x, sizeof(k->bitmaps[i].x), hval);
-        hval = fnv_32a_buf(&k->bitmaps[i].y, sizeof(k->bitmaps[i].y), hval);
+        PMurHash32_Process(&hval, &hcarry, &k->bitmaps[i].image, sizeof(k->bitmaps[i].image));
+        PMurHash32_Process(&hval, &hcarry, &k->bitmaps[i].x, sizeof(k->bitmaps[i].x));
+        PMurHash32_Process(&hval, &hcarry, &k->bitmaps[i].y, sizeof(k->bitmaps[i].y));
     }
-    return hval;
+    return PMurHash32_Result(hval, hcarry, 0);
 }
 
 static unsigned composite_compare(void *a, void *b, size_t key_size)
@@ -240,7 +242,7 @@ struct cache {
 // Hash for a simple (single value or array) type
 static unsigned hash_simple(void *key, size_t key_size)
 {
-    return fnv_32a_buf(key, key_size, FNV1_32A_INIT);
+    return PMurHash32(0, key, key_size);
 }
 
 // Comparison of a simple type

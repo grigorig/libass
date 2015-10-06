@@ -39,18 +39,18 @@
     static unsigned funcname##_hash(void *buf, size_t len) \
     { \
         struct structname *p = buf; \
-        unsigned hval = FNV1_32A_INIT;
+        uint32_t hval = 0, hcarry = 0;
 #define GENERIC(type, member) \
-        hval = fnv_32a_buf(&p->member, sizeof(p->member), hval);
+        PMurHash32_Process(&hval, &hcarry, &p->member, sizeof(p->member));
 #define STRING(member) \
-        hval = fnv_32a_str(p->member, hval);
+        PMurHash32_Process(&hval, &hcarry, p->member, strlen(p->member));
 #define FTVECTOR(member) GENERIC(, member.x); GENERIC(, member.y);
 #define BITMAPHASHKEY(member) { \
         unsigned temp = bitmap_hash(&p->member, sizeof(p->member)); \
-        hval = fnv_32a_buf(&temp, sizeof(temp), hval); \
+        PMurHash32_Process(&hval, &hcarry, &temp, sizeof(temp)); \
         }
 #define END(typedefname) \
-        return hval; \
+        return PMurHash32_Result(hval, hcarry, 0); \
     }
 
 #else
